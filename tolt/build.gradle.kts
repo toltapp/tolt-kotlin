@@ -23,9 +23,11 @@ kotlin {
 
 mavenPublishing {
     publishToMavenCentral()
-    signAllPublications()
+    if (providers.gradleProperty("signingInMemoryKey").isPresent || providers.gradleProperty("signing.keyId").isPresent) {
+        signAllPublications()
+    }
 
-    coordinates("com.tolt", "tolt-android", "0.1.0")
+    coordinates("com.tolt", "tolt-android", providers.gradleProperty("VERSION_NAME").get())
 
     pom {
         name.set("Tolt for Android")

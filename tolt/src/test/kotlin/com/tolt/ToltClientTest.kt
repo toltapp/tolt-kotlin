@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.IOException
+import kotlin.io.path.createTempDirectory
 
 class ToltClientTest {
     private class Request(val url: String, val body: JSONObject)
@@ -26,6 +27,7 @@ class ToltClientTest {
     private val requests = mutableListOf<Request>()
     private var respond: (Request) -> HttpResponse = { HttpResponse(500, "{}") }
     private val store = MemoryStore()
+    private val installStore = MemoryStore()
     private var referrer: String? = null
     private var referrerReads = 0
     private val client = ToltClient(clock = { NOW })
@@ -36,6 +38,7 @@ class ToltClientTest {
             publicId = "pk_123",
             baseUrl = "https://platform.tolt.dev",
             store = store,
+            installStore = installStore,
             transport = Transport { url, json -> Request(url, JSONObject(json)).also { requests += it }.let(respond) },
             installReferrer = InstallReferrerSource { referrerReads++; referrer },
         )
@@ -119,7 +122,7 @@ class ToltClientTest {
     @Test
     fun configureRecordsTheFirstSeenDateOnce() {
         assertEquals(NOW, store.values[FirstSeenStore.KEY])
-        ToltClient(clock = { NOW + 1_000 }).configure("pk_123", "https://platform.tolt.dev", store, { _, _ -> ok("claimed", "u") }, { null })
+        ToltClient(clock = { NOW + 1_000 }).configure("pk_123", "https://platform.tolt.dev", store, installStore, { _, _ -> ok("claimed", "u") }, { null })
         assertEquals(NOW, store.values[FirstSeenStore.KEY])
     }
 
@@ -133,7 +136,7 @@ class ToltClientTest {
 
     @Test
     fun acceptsABaseUrlWithATrailingSlash() = runTest {
-        client.configure("pk_123", "https://platform.tolt.dev/", store, { url, json -> Request(url, JSONObject(json)).also { requests += it }.let(respond) }, { null })
+        client.configure("pk_123", "https://platform.tolt.dev/", store, installStore, { url, json -> Request(url, JSONObject(json)).also { requests += it }.let(respond) }, { null })
         respond = { ok("claimed", "u") }
         client.claim(code = "A", appUserId = "u")
         assertEquals("https://platform.tolt.dev/client/claims", requests.single().url)
@@ -242,7 +245,32 @@ class ToltClientTest {
         referrer = "tolt_code=SAM20"
         assertEquals("appUserId", assertThrows<ToltException.InvalidInput> { client.claimFromInstallReferrer(appUserId = " ") }.field)
         assertEquals(0, referrerReads)
-        assertNull(store.values[ToltClient.INSTALL_REFERRER_KEY])
+        assertNull(installStore.values[ToltClient.INSTALL_REFERRER_KEY])
+    }
+
+    @Test
+    fun keepsTheInstallReferrerMarkerOutOfBackedUpStorage() = runTest {
+        store.values[ToltClient.INSTALL_REFERRER_KEY] = NOW - 86_400_000
+        referrer = "tolt_click=clk_new_install"
+        respond = { ok("claimed", "u") }
+
+        assertEquals(ClaimResult.Status.CLAIMED, client.claimFromInstallReferrer(appUserId = "u")?.status)
+
+        assertEquals("clk_new_install", requests.single().body.getString("click_id"))
+        assertEquals(NOW, installStore.values[ToltClient.INSTALL_REFERRER_KEY])
+        assertEquals(setOf(FirstSeenStore.KEY, ToltClient.INSTALL_REFERRER_KEY), store.values.keys)
+    }
+
+    @Test
+    fun fileStoreKeepsValuesAcrossInstances() {
+        val directory = createTempDirectory("tolt-store").toFile().resolve("no_backup")
+        try {
+            assertNull(FileStore(directory).getLong("key"))
+            FileStore(directory).putLong("key", NOW)
+            assertEquals(NOW, FileStore(directory).getLong("key"))
+        } finally {
+            directory.parentFile?.deleteRecursively()
+        }
     }
 
     @Test

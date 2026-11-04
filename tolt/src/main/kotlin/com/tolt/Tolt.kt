@@ -19,6 +19,7 @@ public object Tolt {
             publicId = publicId,
             baseUrl = baseUrl,
             store = SharedPreferencesStore(appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)),
+            installStore = FileStore(appContext.noBackupFilesDir),
             transport = HttpUrlConnectionTransport,
             installReferrer = PlayInstallReferrer(appContext),
         )

@@ -14,6 +14,7 @@ internal class ToltClient(private val clock: () -> Long = System::currentTimeMil
         val publicId: String,
         val claimsUrl: String,
         val store: Store,
+        val installStore: Store,
         val transport: Transport,
         val installReferrer: InstallReferrerSource,
     )
@@ -26,10 +27,18 @@ internal class ToltClient(private val clock: () -> Long = System::currentTimeMil
         publicId: String,
         baseUrl: String,
         store: Store,
+        installStore: Store,
         transport: Transport,
         installReferrer: InstallReferrerSource,
     ) {
-        configuration = Configuration(publicId, baseUrl.trimEnd('/') + "/client/claims", store, transport, installReferrer)
+        configuration = Configuration(
+            publicId = publicId,
+            claimsUrl = baseUrl.trimEnd('/') + "/client/claims",
+            store = store,
+            installStore = installStore,
+            transport = transport,
+            installReferrer = installReferrer,
+        )
         FirstSeenStore(store).firstSeenAt(clock())
     }
 
@@ -54,7 +63,7 @@ internal class ToltClient(private val clock: () -> Long = System::currentTimeMil
         val configuration = requireConfiguration()
         requireAppUserId(appUserId)
         return installReferrerLock.withLock {
-            val store = configuration.store
+            val store = configuration.installStore
             if (store.getLong(INSTALL_REFERRER_KEY) != null) return@withLock null
             val referrer = configuration.installReferrer.read() ?: return@withLock null
             val reference = ClaimReference.fromQuery(referrer)

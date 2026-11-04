@@ -1,0 +1,20 @@
+[versions]
+agp = "9.5.0"
+coroutines = "1.11.0"
+installreferrer = "2.2"
+junit = "4.13.2"
+json = "20260814"
+maven-publish = "0.37.0"
+
+[libraries]
+installreferrer = { module = "com.android.installreferrer:installreferrer", version.ref = "installreferrer" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+junit = { module = "junit:junit", version.ref = "junit" }
+json = { module = "org.json:json", version.ref = "json" }
+
+[plugins]
+android-library = { id = "com.android.library", version.ref = "agp" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
